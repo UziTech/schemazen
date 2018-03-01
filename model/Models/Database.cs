@@ -122,12 +122,25 @@ namespace SchemaZen.Library.Models {
 		}
 
 		public List<Table> FindTablesRegEx(string pattern, string excludePattern = null) {
-			return Tables.Where(t => FindTablesRegExPredicate(t, pattern, excludePattern)).ToList();
+			return Tables.Where(t => FindNameRegExPredicate(t.Name, pattern, excludePattern)).ToList();
 		}
 
-		private static bool FindTablesRegExPredicate(Table table, string pattern, string excludePattern) {
-			var include = string.IsNullOrEmpty(pattern) || Regex.IsMatch(table.Name, pattern);
-			var exclude = !string.IsNullOrEmpty(excludePattern) && Regex.IsMatch(table.Name, excludePattern);
+		public void FilterNameRegEx(string pattern, string excludePattern = null) {
+			Tables = Tables.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			TableTypes = TableTypes.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			Routines = Routines.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			ForeignKeys = ForeignKeys.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			DataTables = DataTables.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			ViewIndexes = ViewIndexes.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			Assemblies = Assemblies.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			Users = Users.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			Synonyms = Synonyms.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+			Roles = Roles.Where(o => FindNameRegExPredicate(o.Name, pattern, excludePattern)).ToList();
+		}
+
+		private static bool FindNameRegExPredicate(string name, string pattern, string excludePattern) {
+			var include = string.IsNullOrEmpty(pattern) || Regex.IsMatch(name, pattern);
+			var exclude = !string.IsNullOrEmpty(excludePattern) && Regex.IsMatch(name, excludePattern);
 
 			return include && !exclude;
 		}

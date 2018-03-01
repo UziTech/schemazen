@@ -26,6 +26,14 @@ namespace SchemaZen.console {
 				"A regular expression pattern that exclude tables to export data from.",
 				o => DataTablesExcludePattern = o);
 			HasOption(
+				"namePattern=",
+				"A regular expression pattern that matches objects name to save.",
+				o => NamePattern = o);
+			HasOption(
+				"nameExcludePattern=",
+				"A regular expression pattern that exclude objects name to save.",
+				o => NameExcludePattern = o);
+			HasOption(
 				"tableHint=",
 				"Table hint to use when exporting data.",
 				o => TableHint = o);
@@ -45,6 +53,8 @@ namespace SchemaZen.console {
 		protected string OnlyTypes { get; set; }
 		protected string DataTablesPattern { get; set; }
 		protected string DataTablesExcludePattern { get; set; }
+		protected string NamePattern { get; set; }
+		protected string NameExcludePattern { get; set; }
 		protected string TableHint { get; set; }
 
 		public override int Run(string[] args) {
@@ -68,10 +78,11 @@ namespace SchemaZen.console {
 			};
 
 			var filteredTypes = HandleFilteredTypes() ?? HandleOnlyTypes();
+			
 			var namesAndSchemas = HandleDataTables(DataTables);
 
 			try {
-				scriptCommand.Execute(namesAndSchemas, DataTablesPattern, DataTablesExcludePattern, TableHint, filteredTypes);
+				scriptCommand.Execute(namesAndSchemas, DataTablesPattern, DataTablesExcludePattern, NamePattern, NameExcludePattern, TableHint, filteredTypes);
 			} catch (Exception ex) {
 				throw new ConsoleHelpAsException(ex.Message);
 			}

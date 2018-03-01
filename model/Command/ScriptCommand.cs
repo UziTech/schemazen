@@ -8,7 +8,7 @@ namespace SchemaZen.Library.Command {
 	public class ScriptCommand : BaseCommand {
 
 		public void Execute(Dictionary<string, string> namesAndSchemas, string dataTablesPattern, string dataTablesExcludePattern,
-			string tableHint, List<string> filteredTypes) {
+			 string namePattern, string nameExcludePattern, string tableHint, List<string> filteredTypes) {
 			if (!Overwrite && Directory.Exists(ScriptDir)) {
 				var message = $"{ScriptDir} already exists - you must set overwrite to true";
 				throw new InvalidOperationException(message);
@@ -31,7 +31,12 @@ namespace SchemaZen.Library.Command {
 				}
 			}
 
-			db.ScriptToDir(tableHint, Logger.Log);
+			if (!string.IsNullOrEmpty(namePattern) || !string.IsNullOrEmpty(nameExcludePattern))
+			{
+				db.FilterNameRegEx(namePattern, nameExcludePattern);
+			}
+
+				db.ScriptToDir(tableHint, Logger.Log);
 
 			Logger.Log(TraceLevel.Info, $"{Environment.NewLine}Snapshot successfully created at {db.Dir}");
 			var routinesWithWarnings = db.Routines.Select(r => new {
