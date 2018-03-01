@@ -65,10 +65,14 @@ namespace SchemaZen.console {
 		public override int Run(string[] args) {
 			_logger = new Logger(Verbose);
 
-			if (!Overwrite && Directory.Exists(ScriptDir)) {
-				if (!ConsoleQuestion.AskYN($"{ScriptDir} already exists - do you want to replace it"))
+			if (!Overwrite && !OverwriteFiles && Directory.Exists(ScriptDir)) {
+				if (ConsoleQuestion.AskYN($"{ScriptDir} already exists - do you want to cancel"))
 					return 1;
-				Overwrite = true;
+				if (ConsoleQuestion.AskYN($"{ScriptDir} already exists - do you want to delete all files and folders in it")) {
+					Overwrite = true;
+				} else {
+					OverwriteFiles = true;
+				}
 			}
 
 			var scriptCommand = new ScriptCommand {
@@ -79,7 +83,8 @@ namespace SchemaZen.console {
 				Server = Server,
 				User = User,
 				Logger = _logger,
-				Overwrite = Overwrite
+				Overwrite = Overwrite,
+				OverwriteFiles = OverwriteFiles,
 			};
 
 			var filteredTypes = HandleFilteredTypes();

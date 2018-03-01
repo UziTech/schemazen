@@ -83,6 +83,7 @@ namespace SchemaZen.Library.Models {
 		public List<Role> Roles { get; set; } = new List<Role>();
 		public List<SqlUser> Users { get; set; } = new List<SqlUser>();
 		public List<Constraint> ViewIndexes { get; set; } = new List<Constraint>();
+		public List<string> FilesCreated { get; set; } = new List<string>();
 
 		public DbProp FindProp(string name) {
 			return Props.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.CurrentCultureIgnoreCase));
@@ -1225,14 +1226,7 @@ where name = @dbname
 
 		public void ScriptToDir(string tableHint = null, Action<TraceLevel, string> log = null) {
 			if (log == null) log = (tl, s) => { };
-
-			if (Directory.Exists(Dir)) {
-				log(TraceLevel.Verbose, "Deleting existing files...");
-
-				Directory.Delete(Dir, true);
-
-				log(TraceLevel.Verbose, "Existing files deleted.");
-			}
+			
 			Directory.CreateDirectory(Dir);
 
 			WritePropsScript(log);
@@ -1261,7 +1255,8 @@ where name = @dbname
 			text.Append(ScriptPropList(Props));
 			text.AppendLine("GO");
 			text.AppendLine();
-			File.WriteAllText($"{Dir}/props.sql", text.ToString());
+			var filePath = Path.Combine(Dir, "props.sql");
+			WriteToFile(filePath, text.ToString());
 		}
 
 		private void WriteSchemaScript(Action<TraceLevel, string> log) {
@@ -1273,7 +1268,8 @@ where name = @dbname
 			}
 			text.AppendLine("GO");
 			text.AppendLine();
-			File.WriteAllText($"{Dir}/schemas.sql", text.ToString());
+			var filePath = Path.Combine(Dir, "schemas.sql");
+			WriteToFile(filePath, text.ToString());
 		}
 
 		private void WriteScriptDir(string name, ICollection<IScriptable> objects, Action<TraceLevel, string> log) {
@@ -1285,11 +1281,21 @@ where name = @dbname
 				Directory.CreateDirectory(dir);
 			}
 			var index = 0;
+
 			foreach (var o in objects) {
 				log(TraceLevel.Verbose, $"Scripting {name} {++index} of {objects.Count}...{(index < objects.Count ? "\r" : string.Empty)}");
 				var filePath = Path.Combine(dir, MakeFileName(o) + ".sql");
 				var script = o.ScriptCreate() + "\r\nGO\r\n";
-				File.AppendAllText(filePath, script);
+				WriteToFile(filePath, script);
+			}
+		}
+
+		private void WriteToFile(string filePath, string text) {
+			if (FilesCreated.Contains(filePath)) {
+				File.AppendAllText(filePath, text);
+			} else {
+				FilesCreated.Add(filePath);
+				File.WriteAllText(filePath, text);
 			}
 		}
 
