@@ -90,7 +90,8 @@ namespace SchemaZen.console {
 		}
 
 		private List<string> HandleFilteredTypes() {
-			var filteredTypes = FilterTypes?.Split(',').ToList() ?? new List<string>();
+			var filteredTypes = FilterTypes?.Split(',').ToList();
+			if (filteredTypes == null) return null;
 
 			var anyInvalidType = false;
 			foreach (var filterType in filteredTypes) {
