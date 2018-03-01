@@ -77,7 +77,7 @@ namespace SchemaZen.console {
 				Overwrite = Overwrite
 			};
 
-			var filteredTypes = HandleFilteredTypes() ?? HandleOnlyTypes();
+			var filteredTypes = HandleFilteredTypes();
 			
 			var namesAndSchemas = HandleDataTables(DataTables);
 
@@ -88,42 +88,19 @@ namespace SchemaZen.console {
 			}
 			return 0;
 		}
-
+		
 		private List<string> HandleFilteredTypes() {
-			var filteredTypes = FilterTypes?.Split(',').ToList();
-			if (filteredTypes == null) return null;
+			var removeTypes = FilterTypes?.Split(',').ToList() ?? new List<string>();
+			var keepTypes = OnlyTypes?.Split(',').ToList() ?? new List<string>(Database.Dirs);
 
-			var anyInvalidType = false;
-			foreach (var filterType in filteredTypes) {
-				if (!Database.Dirs.Contains(filterType)) {
-					_logger.Log(TraceLevel.Warning, $"{filterType} is not a valid type.");
-					anyInvalidType = true;
-				}
-			}
-
-			if (anyInvalidType) {
+			var invalidTypes = removeTypes.Union(keepTypes).Except(Database.Dirs).ToList();
+			if (invalidTypes.Any()) {
+				var msg = invalidTypes.Count() > 1 ? " are not valid types." : " is not a valid type.";
+				_logger.Log(TraceLevel.Warning, String.Join(", ", invalidTypes.ToArray()) + msg);
 				_logger.Log(TraceLevel.Warning, $"Valid types: {Database.ValidTypes}");
 			}
 
-			return filteredTypes;
-		}
-
-		private List<string> HandleOnlyTypes() {
-			var onlyTypes = OnlyTypes?.Split(',').ToList() ?? new List<string>(Database.Dirs);
-
-			var anyInvalidType = false;
-			foreach (var onlyType in onlyTypes) {
-				if (!Database.Dirs.Contains(onlyType)) {
-					_logger.Log(TraceLevel.Warning, $"{onlyType} is not a valid type.");
-					anyInvalidType = true;
-				}
-			}
-
-			if (anyInvalidType) {
-				_logger.Log(TraceLevel.Warning, $"Valid types: {Database.ValidTypes}");
-			}
-
-			return Database.Dirs.Except(onlyTypes).ToList();
+			return Database.Dirs.Except(keepTypes.Except(removeTypes)).ToList();
 		}
 
 		private Dictionary<string, string> HandleDataTables(string tableNames) {
