@@ -45,6 +45,10 @@ namespace SchemaZen.console {
 				"onlyTypes=",
 				"A comma separated list of the types that will only be scripted. Valid types: " + Database.ValidTypes,
 				o => OnlyTypes = o);
+			HasOption(
+				"1|singleDir",
+				"",
+				o => SingleDir = o != null);
 		}
 
 		private Logger _logger;
@@ -56,6 +60,7 @@ namespace SchemaZen.console {
 		protected string NamePattern { get; set; }
 		protected string NameExcludePattern { get; set; }
 		protected string TableHint { get; set; }
+		protected bool SingleDir { get; set; }
 
 		public override int Run(string[] args) {
 			_logger = new Logger(Verbose);
@@ -82,7 +87,7 @@ namespace SchemaZen.console {
 			var namesAndSchemas = HandleDataTables(DataTables);
 
 			try {
-				scriptCommand.Execute(namesAndSchemas, DataTablesPattern, DataTablesExcludePattern, NamePattern, NameExcludePattern, TableHint, filteredTypes);
+				scriptCommand.Execute(namesAndSchemas, DataTablesPattern, DataTablesExcludePattern, NamePattern, NameExcludePattern, TableHint, filteredTypes, SingleDir);
 			} catch (Exception ex) {
 				throw new ConsoleHelpAsException(ex.Message);
 			}

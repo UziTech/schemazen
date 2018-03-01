@@ -8,13 +8,13 @@ namespace SchemaZen.Library.Command {
 	public class ScriptCommand : BaseCommand {
 
 		public void Execute(Dictionary<string, string> namesAndSchemas, string dataTablesPattern, string dataTablesExcludePattern,
-			 string namePattern, string nameExcludePattern, string tableHint, List<string> filteredTypes) {
+			 string namePattern, string nameExcludePattern, string tableHint, List<string> filteredTypes, bool singleDir) {
 			if (!Overwrite && Directory.Exists(ScriptDir)) {
 				var message = $"{ScriptDir} already exists - you must set overwrite to true";
 				throw new InvalidOperationException(message);
 			}
 
-			var db = CreateDatabase(filteredTypes);
+			var db = CreateDatabase(filteredTypes, singleDir);
 
 			Logger.Log(TraceLevel.Verbose, "Loading database schema...");
 			db.Load();
