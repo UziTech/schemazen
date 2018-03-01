@@ -136,7 +136,7 @@ namespace SchemaZen.Library.Models {
 
 		private static readonly HashSet<string> _dirs = new HashSet<string> {
 			"user_defined_types", "tables", "foreign_keys", "assemblies", "functions", "procedures", "triggers",
-			"views", "xmlschemacollections", "data", "roles", "users", "synonyms", "table_types"
+			"views", "xmlschemacollections", "data", "roles", "users", "synonyms", "table_types", "schemas", "props"
 		};
 
 		public static HashSet<string> Dirs => _dirs;
@@ -222,9 +222,9 @@ create table #ScriptedRoles (
 )
 
 insert into #ScriptedRoles
-select 
+select
 	name
-,	null as script 
+,	null as script
 from sys.database_principals
 where type = 'R'
 	and name not in (
@@ -258,7 +258,7 @@ begin
 				WHEN 'G' THEN 'GRANT '
 				WHEN 'R' THEN 'REVOKE '
 				WHEN 'W' THEN 'GRANT '
-			END + 
+			END +
 			dp.permission_name + ' ' +
 			CASE dp.class
 				WHEN 0 THEN ''
@@ -269,13 +269,13 @@ begin
 						+ 'ON [' +
 						(SELECT SCHEMA_NAME(schema_id) + '].[' + name FROM sys.objects WHERE object_id = dp.major_id)
 							+ -- optionally concatenate column names
-						CASE WHEN MAX(dp.minor_id) > 0 
+						CASE WHEN MAX(dp.minor_id) > 0
 							 THEN '] ([' + REPLACE(
-											(SELECT name + '], [' 
-											 FROM sys.columns 
-											 WHERE object_id = dp.major_id 
-												AND column_id IN (SELECT minor_id 
-																  FROM sys.database_permissions 
+											(SELECT name + '], ['
+											 FROM sys.columns
+											 WHERE object_id = dp.major_id
+												AND column_id IN (SELECT minor_id
+																  FROM sys.database_permissions
 																  WHERE major_id = dp.major_id
 																	AND USER_NAME(grantee_principal_id) IN (@roleName)
 																 )
@@ -300,19 +300,19 @@ begin
 				WHEN 25 THEN 'ON CERTIFICATE::[' + (SELECT name FROM sys.certificates WHERE certificate_id = dp.major_id) + '] '
 				WHEN 26 THEN 'ON ASYMMETRIC KEY::[' + (SELECT name FROM sys.asymmetric_keys WHERE asymmetric_key_id = dp.major_id) + '] '
 			 END COLLATE SQL_Latin1_General_CP1_CI_AS
-			 + 'TO [' + @roleName + ']' + 
+			 + 'TO [' + @roleName + ']' +
 			 CASE dp.state WHEN 'W' THEN ' WITH GRANT OPTION' ELSE '' END + @crlf
 	FROM    sys.database_permissions dp
 	WHERE    USER_NAME(dp.grantee_principal_id) IN (@roleName)
 	GROUP BY dp.state, dp.major_id, dp.permission_name, dp.class
 
-	update #ScriptedRoles 
+	update #ScriptedRoles
 	set script = @roleDesc
 	where name = @RoleName
 
 end
 
-select 
+select
     name
 ,   script
 from #ScriptedRoles
@@ -377,7 +377,7 @@ from #ScriptedRoles
 				// get CLR assemblies
 				cm.CommandText = @"select a.name as AssemblyName, a.permission_set_desc, af.name as FileName, af.content
 						from sys.assemblies a
-						inner join sys.assembly_files af on a.assembly_id = af.assembly_id 
+						inner join sys.assembly_files af on a.assembly_id = af.assembly_id
 						where a.is_user_defined = 1
 						order by a.name, af.file_id";
 				SqlAssembly a = null;
@@ -487,15 +487,15 @@ from #ScriptedRoles
 					WHERE type_desc = 'CHECK_CONSTRAINT'
 				)
 
-				SELECT CONSTRAINT_CATALOG AS TABLE_CATALOG, CONSTRAINT_SCHEMA AS TABLE_SCHEMA, 
+				SELECT CONSTRAINT_CATALOG AS TABLE_CATALOG, CONSTRAINT_SCHEMA AS TABLE_SCHEMA,
 						NotForReplication,
-						TableName AS TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE 
+						TableName AS TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE
 				FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS
-				INNER JOIN SysObjectCheckConstraints ON 
+				INNER JOIN SysObjectCheckConstraints ON
 				SysObjectCheckConstraints.SchemaName = CHECK_CONSTRAINTS.CONSTRAINT_SCHEMA AND
-				SysObjectCheckConstraints.ConstraintName = CHECK_CONSTRAINTS.CONSTRAINT_NAME 
+				SysObjectCheckConstraints.ConstraintName = CHECK_CONSTRAINTS.CONSTRAINT_NAME
 
- 
+
 			";
 
 			using (var dr = cm.ExecuteReader()) {
@@ -514,9 +514,9 @@ from #ScriptedRoles
 		private void LoadForeignKeys(SqlCommand cm) {
 			//get foreign keys
 			cm.CommandText = @"
-					select 
+					select
 						TABLE_SCHEMA,
-						TABLE_NAME, 
+						TABLE_NAME,
 						CONSTRAINT_NAME
 					from INFORMATION_SCHEMA.TABLE_CONSTRAINTS
 					where CONSTRAINT_TYPE = 'FOREIGN KEY'";
@@ -531,10 +531,10 @@ from #ScriptedRoles
 
 			//get foreign key props
 			cm.CommandText = @"
-					select 
-						CONSTRAINT_NAME, 
+					select
+						CONSTRAINT_NAME,
 						OBJECT_SCHEMA_NAME(fk.parent_object_id) as TABLE_SCHEMA,
-						UPDATE_RULE, 
+						UPDATE_RULE,
 						DELETE_RULE,
 						fk.is_disabled,
                         fk.is_system_named
@@ -588,15 +588,15 @@ order by fk.name, fkc.constraint_column_id
 		private void LoadConstraintsAndIndexes(SqlCommand cm) {
 			//get constraints & indexes
 			cm.CommandText = @"
-					select 
+					select
 						s.name as schemaName,
-						t.name as tableName, 
+						t.name as tableName,
 						t.baseType,
-						i.name as indexName, 
+						i.name as indexName,
 						c.name as columnName,
-						i.is_primary_key, 
+						i.is_primary_key,
 						i.is_unique_constraint,
-						i.is_unique, 
+						i.is_unique,
 						i.type_desc,
 						i.filter_definition,
 						isnull(ic.is_included_column, 0) as is_included_column,
@@ -686,14 +686,14 @@ order by fk.name, fkc.constraint_column_id
 		private void LoadColumnDefaults(SqlCommand cm) {
 			//get column defaults
 			cm.CommandText = @"
-					select 
+					select
 						s.name as TABLE_SCHEMA,
-						t.name as TABLE_NAME, 
-						c.name as COLUMN_NAME, 
-						d.name as DEFAULT_NAME, 
+						t.name as TABLE_NAME,
+						c.name as COLUMN_NAME,
+						d.name as DEFAULT_NAME,
 						d.definition as DEFAULT_VALUE,
                         d.is_system_named as IS_SYSTEM_NAMED
-					from sys.tables t 
+					from sys.tables t
 						inner join sys.columns c on c.object_id = t.object_id
 						inner join sys.default_constraints d on c.column_id = d.parent_column_id
 							and d.parent_object_id = c.object_id
@@ -710,12 +710,12 @@ order by fk.name, fkc.constraint_column_id
 		private void LoadColumnIdentities(SqlCommand cm) {
 			//get column identities
 			cm.CommandText = @"
-					select 
+					select
 						s.name as TABLE_SCHEMA,
-						t.name as TABLE_NAME, 
+						t.name as TABLE_NAME,
 						c.name AS COLUMN_NAME,
 						i.SEED_VALUE, i.INCREMENT_VALUE
-					from sys.tables t 
+					from sys.tables t
 						inner join sys.columns c on c.object_id = t.object_id
 						inner join sys.identity_columns i on i.object_id = c.object_id
 							and i.column_id = c.column_id
@@ -739,7 +739,7 @@ order by fk.name, fkc.constraint_column_id
 		private void LoadColumns(SqlCommand cm) {
 			//get columns
 			cm.CommandText = @"
-				select 
+				select
 					t.TABLE_SCHEMA,
 					c.TABLE_NAME,
 					c.COLUMN_NAME,
@@ -765,9 +765,9 @@ order by fk.name, fkc.constraint_column_id
 
 			try {
 				cm.CommandText = @"
-				select 
+				select
 					s.name as TABLE_SCHEMA,
-					tt.name as TABLE_NAME, 
+					tt.name as TABLE_NAME,
 					c.name as COLUMN_NAME,
 					t.name as DATA_TYPE,
 					c.column_id as ORDINAL_POSITION,
@@ -780,7 +780,7 @@ order by fk.name, fkc.constraint_column_id
 					inner join sys.table_types tt
 						on tt.type_table_object_id = c.object_id
 					inner join sys.schemas s
-						on tt.schema_id = s.schema_id 
+						on tt.schema_id = s.schema_id
 					inner join sys.types t
 						on t.system_type_id = c.system_type_id
 							and t.user_type_id = c.user_type_id
@@ -834,9 +834,9 @@ order by fk.name, fkc.constraint_column_id
 		private void LoadTables(SqlCommand cm) {
 			//get tables
 			cm.CommandText = @"
-				select 
-					TABLE_SCHEMA, 
-					TABLE_NAME 
+				select
+					TABLE_SCHEMA,
+					TABLE_NAME
 				from INFORMATION_SCHEMA.TABLES
 				where TABLE_TYPE = 'BASE TABLE'";
 			using (var dr = cm.ExecuteReader()) {
@@ -846,7 +846,7 @@ order by fk.name, fkc.constraint_column_id
 			//get table types
 			try {
 				cm.CommandText = @"
-				select 
+				select
 					s.name as TABLE_SCHEMA,
 					tt.name as TABLE_NAME
 				from sys.table_types tt
@@ -870,7 +870,7 @@ order by fk.name, fkc.constraint_column_id
                 t.name as 'Type_Name',
                 tt.name as 'Base_Type_Name',
                 t.max_length as 'Max_Length',
-                t.is_nullable as 'Nullable'	
+                t.is_nullable as 'Nullable'
             from sys.types t
             inner join sys.schemas s on s.schema_id = t.schema_id
             inner join sys.types tt on t.system_type_id = tt.user_type_id
@@ -1002,7 +1002,7 @@ where name = @dbname
 				Db = db
 			};
 
-			//compare database properties		   
+			//compare database properties
 			foreach (var p in from p in Props
 							  let p2 = db.FindProp(p.Name)
 							  where p.Script() != p2.Script()
@@ -1244,6 +1244,7 @@ where name = @dbname
 		}
 
 		private void WritePropsScript(Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("props")) return;
 			log(TraceLevel.Verbose, "Scripting database properties...");
 			var text = new StringBuilder();
 			text.Append(ScriptPropList(Props));
@@ -1253,6 +1254,7 @@ where name = @dbname
 		}
 
 		private void WriteSchemaScript(Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("schemas")) return;
 			log(TraceLevel.Verbose, "Scripting database schemas...");
 			var text = new StringBuilder();
 			foreach (var schema in Schemas) {
