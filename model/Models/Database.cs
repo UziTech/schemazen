@@ -630,6 +630,9 @@ from #ScriptedRoles
 				while (dr.Read()) {
 					log(TraceLevel.Verbose, "- Loading Foreign Keys...\r");
 					var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
+					if (t == null) {
+						t = new Table((string)dr["TABLE_SCHEMA"], (string)dr["TABLE_NAME"]);
+					}
 					var fk = new ForeignKey((string)dr["CONSTRAINT_NAME"]);
 					fk.Table = t;
 					ForeignKeys.Add(fk);
@@ -977,7 +980,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadTables(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (_dirs.Contains("tables") || _dirs.Contains("foreign_keys")) {
+			if (_dirs.Contains("tables")) {
 				//get tables
 				cm.CommandText = @"
 					select
@@ -1479,7 +1482,7 @@ where name = @dbname
 				File.AppendAllText(filePath, text);
 			} else {
 				FilesCreated.Add(filePath);
-				text = $"/****** Created: {DateTime.Now.ToString("dddd, dd MMMM yyyy h:mm:ss tt")} ******/\r\n\r\n{text}";
+				// text = $"/****** Created: {DateTime.Now.ToString("dddd, dd MMMM yyyy h:mm:ss tt")} ******/\r\n\r\n{text}";
 				File.WriteAllText(filePath, text);
 			}
 		}
