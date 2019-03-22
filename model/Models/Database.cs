@@ -191,7 +191,9 @@ namespace SchemaZen.Library.Models {
 
 		#region Load
 
-		public void Load() {
+		public void Load(Action<TraceLevel, string> log = null) {
+			if (log == null) log = (tl, s) => { };
+
 			Tables.Clear();
 			TableTypes.Clear();
 			Routines.Clear();
@@ -207,29 +209,31 @@ namespace SchemaZen.Library.Models {
 			using (var cn = new SqlConnection(Connection)) {
 				cn.Open();
 				using (var cm = cn.CreateCommand()) {
-					LoadProps(cm);
-					LoadSchemas(cm);
-					LoadTables(cm);
-					LoadUserDefinedTypes(cm);
-					LoadColumns(cm);
-					LoadColumnIdentities(cm);
-					LoadColumnDefaults(cm);
-					LoadColumnComputes(cm);
-					LoadConstraintsAndIndexes(cm);
-					LoadCheckConstraints(cm);
-					LoadForeignKeys(cm);
-					LoadRoutines(cm);
-					LoadXmlSchemas(cm);
-					LoadCLRAssemblies(cm);
-					LoadUsersAndLogins(cm);
-					LoadSynonyms(cm);
-					LoadRoles(cm);
-					LoadPermissions(cm);
+					LoadProps(cm, log);
+					LoadSchemas(cm, log);
+					LoadTables(cm, log);
+					LoadUserDefinedTypes(cm, log);
+					LoadColumns(cm, log);
+					LoadColumnIdentities(cm, log);
+					LoadColumnDefaults(cm, log);
+					LoadColumnComputes(cm, log);
+					LoadConstraintsAndIndexes(cm, log);
+					LoadCheckConstraints(cm, log);
+					LoadForeignKeys(cm, log);
+					LoadRoutines(cm, log);
+					LoadXmlSchemas(cm, log);
+					LoadCLRAssemblies(cm, log);
+					LoadUsersAndLogins(cm, log);
+					LoadSynonyms(cm, log);
+					LoadRoles(cm, log);
+					LoadPermissions(cm, log);
 				}
 			}
 		}
 
-		private void LoadSynonyms(SqlCommand cm) {
+		private void LoadSynonyms(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("synonyms")) return;
+
 			try {
 				// get synonyms
 				cm.CommandText = @"
@@ -237,6 +241,7 @@ namespace SchemaZen.Library.Models {
 						from sys.synonyms";
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
+						log(TraceLevel.Verbose, "- Loading Synonyms...\r");
 						var synonym = new Synonym((string)dr["synonym_name"],
 							(string)dr["schema_name"]);
 						synonym.BaseObjectName = (string)dr["base_object_name"];
@@ -248,7 +253,9 @@ namespace SchemaZen.Library.Models {
 			}
 		}
 
-		private void LoadPermissions(SqlCommand cm) {
+		private void LoadPermissions(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("permissions")) return;
+
 			try {
 				// get permissions
 				// based on http://sql-articles.com/scripts/script-to-retrieve-security-information-sql-server-2005-and-above/
@@ -262,6 +269,7 @@ namespace SchemaZen.Library.Models {
 						join sys.sysobjects O on major_id = id ";
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
+						log(TraceLevel.Verbose, "- Loading Permissions...\r");
 						var permission = new Permission((string)dr["user_name"],
 							(string)dr["object_name"], (string)dr["permission"]);
 						Permissions.Add(permission);
@@ -272,7 +280,9 @@ namespace SchemaZen.Library.Models {
 			}
 		}
 
-		private void LoadRoles(SqlCommand cm) {
+		private void LoadRoles(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("roles")) return;
+
 			//Roles are complicated.  This was adapted from https://dbaeyes.wordpress.com/2013/04/19/fully-script-out-a-mssql-database-role/
 			cm.CommandText = @"
 create table #ScriptedRoles (
@@ -334,10 +344,10 @@ begin
 											 FROM sys.columns
 											 WHERE object_id = dp.major_id
 												AND column_id IN (SELECT minor_id
-																  FROM sys.database_permissions
-																  WHERE major_id = dp.major_id
+																FROM sys.database_permissions
+																WHERE major_id = dp.major_id
 																	AND USER_NAME(grantee_principal_id) IN (@roleName)
-																 )
+																)
 											 FOR XML PATH('')
 											) --replace final square bracket pair
 										+ '])', ', []', '')
@@ -379,6 +389,7 @@ from #ScriptedRoles
 			Role r = null;
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Roles...\r");
 					r = new Role {
 						Name = (string)dr["name"],
 						Script = (string)dr["script"]
@@ -388,7 +399,9 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadUsersAndLogins(SqlCommand cm) {
+		private void LoadUsersAndLogins(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("users")) return;
+
 			// get users that have access to the database
 			cm.CommandText = @"
 				select dp.name as UserName, USER_NAME(drm.role_principal_id) as AssociatedDBRole, default_schema_name
@@ -401,6 +414,7 @@ from #ScriptedRoles
 			SqlUser u = null;
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Users...\r");
 					if (u == null || u.Name != (string)dr["UserName"])
 						u = new SqlUser((string)dr["UserName"], (string)dr["default_schema_name"]);
 					if (!(dr["AssociatedDBRole"] is DBNull))
@@ -421,6 +435,7 @@ from #ScriptedRoles
 					order by sp.name";
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
+						log(TraceLevel.Verbose, "- Loading Users...\r");
 						u = FindUser((string)dr["name"]);
 						if (u != null && !(dr["password_hash"] is DBNull))
 							u.PasswordHash = (byte[])dr["password_hash"];
@@ -431,7 +446,9 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadCLRAssemblies(SqlCommand cm) {
+		private void LoadCLRAssemblies(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("assemblies")) return;
+
 			try {
 				// get CLR assemblies
 				cm.CommandText =
@@ -443,6 +460,7 @@ from #ScriptedRoles
 				SqlAssembly a = null;
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
+						log(TraceLevel.Verbose, "- Loading Assemblies...\r");
 						if (a == null || a.Name != (string)dr["AssemblyName"]) {
 							a = new SqlAssembly((string)dr["permission_set_desc"],
 								(string)dr["AssemblyName"]);
@@ -459,7 +477,9 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadXmlSchemas(SqlCommand cm) {
+		private void LoadXmlSchemas(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("xmlschemacollections")) return;
+
 			try {
 				// get xml schemas
 				cm.CommandText = @"
@@ -469,6 +489,7 @@ from #ScriptedRoles
 						where s.name != 'sys'";
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
+						log(TraceLevel.Verbose, "- Loading Xml Schemas...\r");
 						var r = new Routine((string)dr["DBSchemaName"],
 							(string)dr["XMLSchemaCollectionName"], this) {
 							Text =
@@ -485,9 +506,21 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadRoutines(SqlCommand cm) {
+		private void LoadRoutines(SqlCommand cm, Action<TraceLevel, string> log) {
+			var types = new List<string>();
+			if (_dirs.Contains("functions")) {
+				types.Add("SQL_SCALAR_FUNCTION");
+				types.Add("SQL_INLINE_TABLE_VALUED_FUNCTION");
+				types.Add("SQL_TABLE_VALUED_FUNCTION");
+			}
+			if (_dirs.Contains("procedures")) types.Add("SQL_STORED_PROCEDURE");
+			if (_dirs.Contains("triggers")) types.Add("SQL_TRIGGER");
+			if (_dirs.Contains("views")) types.Add("VIEW");
+
+			if (!types.Any()) return;
+
 			//get routines
-			cm.CommandText = @"
+			cm.CommandText = $@"
 					select
 						s.name as schemaName,
 						o.name as routineName,
@@ -507,9 +540,11 @@ from #ScriptedRoles
 						left join sys.schemas s2 on s2.schema_id = t.schema_id
 						left join sys.schemas s3 on s3.schema_id = v.schema_id
 					where objectproperty(o.object_id, 'IsMSShipped') = 0
+						and o.type_desc in ('{String.Join("', '", types.ToArray())}')
 					";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Routines...\r");
 					var r = new Routine((string)dr["schemaName"], (string)dr["routineName"], this);
 					r.Text = dr["definition"] is DBNull ? string.Empty : (string)dr["definition"];
 					r.AnsiNull = (bool)dr["uses_ansi_nulls"];
@@ -539,7 +574,9 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadCheckConstraints(SqlCommand cm) {
+		private void LoadCheckConstraints(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("tables")) return;
+
 			cm.CommandText = @"
 
 				WITH SysObjectCheckConstraints AS
@@ -565,6 +602,7 @@ from #ScriptedRoles
 
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Check Constraints...\r");
 					var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
 					var constraint = Constraint.CreateCheckedConstraint(
 						(string)dr["CONSTRAINT_NAME"],
@@ -577,7 +615,9 @@ from #ScriptedRoles
 			}
 		}
 
-		private void LoadForeignKeys(SqlCommand cm) {
+		private void LoadForeignKeys(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("foreign_keys")) return;
+
 			//get foreign keys
 			cm.CommandText = @"
 					select
@@ -588,6 +628,7 @@ from #ScriptedRoles
 					where CONSTRAINT_TYPE = 'FOREIGN KEY'";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Foreign Keys...\r");
 					var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
 					var fk = new ForeignKey((string)dr["CONSTRAINT_NAME"]);
 					fk.Table = t;
@@ -603,11 +644,12 @@ from #ScriptedRoles
 						UPDATE_RULE,
 						DELETE_RULE,
 						fk.is_disabled,
-                        fk.is_system_named
+						fk.is_system_named
 					from INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
 						inner join sys.foreign_keys fk on rc.CONSTRAINT_NAME = fk.name and rc.CONSTRAINT_SCHEMA = OBJECT_SCHEMA_NAME(fk.parent_object_id)";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Foreign Keys...\r");
 					var fk = FindForeignKey((string)dr["CONSTRAINT_NAME"],
 						(string)dr["TABLE_SCHEMA"]);
 					fk.OnUpdate = (string)dr["UPDATE_RULE"];
@@ -639,6 +681,7 @@ order by fk.name, fkc.constraint_column_id
 ";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Foreign Keys...\r");
 					var fk = FindForeignKey((string)dr["CONSTRAINT_NAME"],
 						(string)dr["TABLE_SCHEMA"]);
 					if (fk == null) {
@@ -655,9 +698,16 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadConstraintsAndIndexes(SqlCommand cm) {
+		private void LoadConstraintsAndIndexes(SqlCommand cm, Action<TraceLevel, string> log) {
+			var types = new List<string>();
+			if (_dirs.Contains("views")) types.Add("V");
+			if (_dirs.Contains("tables")) types.Add("T");
+			if (_dirs.Contains("table_types")) types.Add("TVT");
+
+			if (!types.Any()) return;
+
 			//get constraints & indexes
-			cm.CommandText = @"
+			cm.CommandText = $@"
 					select
 						s.name as schemaName,
 						t.name as tableName,
@@ -689,9 +739,11 @@ order by fk.name, fkc.constraint_column_id
 							and c.column_id = ic.column_id
 						inner join sys.schemas s on s.schema_id = t.schema_id
 					where i.type_desc != 'HEAP'
+						and t.baseType in ('{String.Join("', '", types.ToArray())}')
 					order by s.name, t.name, i.name, ic.key_ordinal, ic.index_column_id";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Constraints And Indexes...\r");
 					var schemaName = (string)dr["schemaName"];
 					var tableName = (string)dr["tableName"];
 					var indexName = (string)dr["indexName"];
@@ -734,7 +786,9 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadColumnComputes(SqlCommand cm) {
+		private void LoadColumnComputes(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("tables")) return;
+
 			//get computed column definitions
 			cm.CommandText = @"
 					select
@@ -747,6 +801,7 @@ order by fk.name, fkc.constraint_column_id
 					";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Column Computes...\r");
 					var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
 					var column = t.Columns.Find((string)dr["COLUMN_NAME"]);
 					column.ComputedDefinition = (string)dr["DEFINITION"];
@@ -755,7 +810,9 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadColumnDefaults(SqlCommand cm) {
+		private void LoadColumnDefaults(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("tables")) return;
+
 			//get column defaults
 			cm.CommandText = @"
 					select
@@ -764,7 +821,7 @@ order by fk.name, fkc.constraint_column_id
 						c.name as COLUMN_NAME,
 						d.name as DEFAULT_NAME,
 						d.definition as DEFAULT_VALUE,
-                        d.is_system_named as IS_SYSTEM_NAMED
+						d.is_system_named as IS_SYSTEM_NAMED
 					from sys.tables t
 						inner join sys.columns c on c.object_id = t.object_id
 						inner join sys.default_constraints d on c.column_id = d.parent_column_id
@@ -772,6 +829,7 @@ order by fk.name, fkc.constraint_column_id
 						inner join sys.schemas s on s.schema_id = t.schema_id";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Column Defaults...\r");
 					var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
 					t.Columns.Find((string)dr["COLUMN_NAME"]).Default = new Default(
 						(string)dr["DEFAULT_NAME"],
@@ -780,7 +838,9 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadColumnIdentities(SqlCommand cm) {
+		private void LoadColumnIdentities(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("tables")) return;
+
 			//get column identities
 			cm.CommandText = @"
 					select
@@ -795,6 +855,7 @@ order by fk.name, fkc.constraint_column_id
 						inner join sys.schemas s on s.schema_id = t.schema_id ";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Column Identities...\r");
 					try {
 						var t = FindTable((string)dr["TABLE_NAME"], (string)dr["TABLE_SCHEMA"]);
 						var c = t.Columns.Find((string)dr["COLUMN_NAME"]);
@@ -810,70 +871,75 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadColumns(SqlCommand cm) {
-			//get columns
-			cm.CommandText = @"
-				select
-					t.TABLE_SCHEMA,
-					c.TABLE_NAME,
-					c.COLUMN_NAME,
-					c.DATA_TYPE,
-					c.ORDINAL_POSITION,
-					c.IS_NULLABLE,
-					c.CHARACTER_MAXIMUM_LENGTH,
-					c.NUMERIC_PRECISION,
-					c.NUMERIC_SCALE,
-					CASE WHEN COLUMNPROPERTY(OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME), c.COLUMN_NAME, 'IsRowGuidCol') = 1 THEN 'YES' ELSE 'NO' END AS IS_ROW_GUID_COL
-				from INFORMATION_SCHEMA.COLUMNS c
-					inner join INFORMATION_SCHEMA.TABLES t
-							on t.TABLE_NAME = c.TABLE_NAME
-								and t.TABLE_SCHEMA = c.TABLE_SCHEMA
-								and t.TABLE_CATALOG = c.TABLE_CATALOG
-				where
-					t.TABLE_TYPE = 'BASE TABLE'
-				order by t.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
-";
-			using (var dr = cm.ExecuteReader()) {
-				LoadColumnsBase(dr, Tables);
-			}
-
-			try {
+		private void LoadColumns(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (_dirs.Contains("tables")) {
+				//get columns
 				cm.CommandText = @"
-				select
-					s.name as TABLE_SCHEMA,
-					tt.name as TABLE_NAME,
-					c.name as COLUMN_NAME,
-					t.name as DATA_TYPE,
-					c.column_id as ORDINAL_POSITION,
-					CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END as IS_NULLABLE,
-					CASE WHEN t.name = 'nvarchar' and c.max_length > 0 THEN CAST(c.max_length as int)/2 ELSE CAST(c.max_length as int) END as CHARACTER_MAXIMUM_LENGTH,
-					c.precision as NUMERIC_PRECISION,
-					CAST(c.scale as int) as NUMERIC_SCALE,
-					CASE WHEN c.is_rowguidcol = 1 THEN 'YES' ELSE 'NO' END as IS_ROW_GUID_COL
-				from sys.columns c
-					inner join sys.table_types tt
-						on tt.type_table_object_id = c.object_id
-					inner join sys.schemas s
-						on tt.schema_id = s.schema_id
-					inner join sys.types t
-						on t.system_type_id = c.system_type_id
-							and t.user_type_id = c.user_type_id
-				where
-					tt.is_user_defined = 1
-				order by s.name, tt.name, c.column_id
+					select
+						t.TABLE_SCHEMA,
+						c.TABLE_NAME,
+						c.COLUMN_NAME,
+						c.DATA_TYPE,
+						c.ORDINAL_POSITION,
+						c.IS_NULLABLE,
+						c.CHARACTER_MAXIMUM_LENGTH,
+						c.NUMERIC_PRECISION,
+						c.NUMERIC_SCALE,
+						CASE WHEN COLUMNPROPERTY(OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME), c.COLUMN_NAME, 'IsRowGuidCol') = 1 THEN 'YES' ELSE 'NO' END AS IS_ROW_GUID_COL
+					from INFORMATION_SCHEMA.COLUMNS c
+						inner join INFORMATION_SCHEMA.TABLES t
+								on t.TABLE_NAME = c.TABLE_NAME
+									and t.TABLE_SCHEMA = c.TABLE_SCHEMA
+									and t.TABLE_CATALOG = c.TABLE_CATALOG
+					where
+						t.TABLE_TYPE = 'BASE TABLE'
+					order by t.TABLE_SCHEMA, c.TABLE_NAME, c.ORDINAL_POSITION
 ";
 				using (var dr = cm.ExecuteReader()) {
-					LoadColumnsBase(dr, TableTypes);
+					LoadColumnsBase(dr, Tables, () => log(TraceLevel.Verbose, "- Loading Table Columns...\r"));
 				}
-			} catch (SqlException) {
-				// SQL server version doesn't support table types, nothing to do
+			}
+
+			if (_dirs.Contains("table_types")) {
+				try {
+					cm.CommandText = @"
+						select
+							s.name as TABLE_SCHEMA,
+							tt.name as TABLE_NAME,
+							c.name as COLUMN_NAME,
+							t.name as DATA_TYPE,
+							c.column_id as ORDINAL_POSITION,
+							CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END as IS_NULLABLE,
+							CASE WHEN t.name = 'nvarchar' and c.max_length > 0 THEN CAST(c.max_length as int)/2 ELSE CAST(c.max_length as int) END as CHARACTER_MAXIMUM_LENGTH,
+							c.precision as NUMERIC_PRECISION,
+							CAST(c.scale as int) as NUMERIC_SCALE,
+							CASE WHEN c.is_rowguidcol = 1 THEN 'YES' ELSE 'NO' END as IS_ROW_GUID_COL
+						from sys.columns c
+							inner join sys.table_types tt
+								on tt.type_table_object_id = c.object_id
+							inner join sys.schemas s
+								on tt.schema_id = s.schema_id
+							inner join sys.types t
+								on t.system_type_id = c.system_type_id
+									and t.user_type_id = c.user_type_id
+						where
+							tt.is_user_defined = 1
+						order by s.name, tt.name, c.column_id
+";
+					using (var dr = cm.ExecuteReader()) {
+						LoadColumnsBase(dr, TableTypes, () => log(TraceLevel.Verbose, "- Loading Table Type columns...\r"));
+					}
+				} catch (SqlException) {
+					// SQL server version doesn't support table types, nothing to do
+				}
 			}
 		}
 
-		private static void LoadColumnsBase(IDataReader dr, List<Table> tables) {
+		private static void LoadColumnsBase(IDataReader dr, List<Table> tables, Action moveLoading) {
 			Table table = null;
 
 			while (dr.Read()) {
+				moveLoading();
 				var c = new Column {
 					Name = (string)dr["COLUMN_NAME"],
 					Type = (string)dr["DATA_TYPE"],
@@ -910,60 +976,68 @@ order by fk.name, fkc.constraint_column_id
 			}
 		}
 
-		private void LoadTables(SqlCommand cm) {
-			//get tables
-			cm.CommandText = @"
-				select
-					TABLE_SCHEMA,
-					TABLE_NAME
-				from INFORMATION_SCHEMA.TABLES
-				where TABLE_TYPE = 'BASE TABLE'";
-			using (var dr = cm.ExecuteReader()) {
-				LoadTablesBase(dr, false, Tables);
+		private void LoadTables(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (_dirs.Contains("tables") || _dirs.Contains("foreign_keys")) {
+				//get tables
+				cm.CommandText = @"
+					select
+						TABLE_SCHEMA,
+						TABLE_NAME
+					from INFORMATION_SCHEMA.TABLES
+					where TABLE_TYPE = 'BASE TABLE'";
+				using (var dr = cm.ExecuteReader()) {
+					LoadTablesBase(dr, false, Tables, () => log(TraceLevel.Verbose, "- Loading Tables...\r"));
+				}
 			}
 
-			//get table types
-			try {
-				cm.CommandText = @"
-				select
-					s.name as TABLE_SCHEMA,
-					tt.name as TABLE_NAME
-				from sys.table_types tt
-				inner join sys.schemas s on tt.schema_id = s.schema_id
-				where tt.is_user_defined = 1
-				order by s.name, tt.name";
-				using (var dr = cm.ExecuteReader()) {
-					LoadTablesBase(dr, true, TableTypes);
+			if (_dirs.Contains("table_types")) {
+				//get table types
+				try {
+					cm.CommandText = @"
+					select
+						s.name as TABLE_SCHEMA,
+						tt.name as TABLE_NAME
+					from sys.table_types tt
+					inner join sys.schemas s on tt.schema_id = s.schema_id
+					where tt.is_user_defined = 1
+					order by s.name, tt.name";
+					using (var dr = cm.ExecuteReader()) {
+						LoadTablesBase(dr, true, TableTypes, () => log(TraceLevel.Verbose, "- Loading Table Types...\r"));
+					}
+				} catch (SqlException) {
+					// SQL server version doesn't support table types, nothing to do here
 				}
-			} catch (SqlException) {
-				// SQL server version doesn't support table types, nothing to do here
 			}
 		}
 
-		private void LoadUserDefinedTypes(SqlCommand cm) {
+		private void LoadUserDefinedTypes(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("user_defined_types")) return;
+
 			//get types
 			cm.CommandText = @"
-            select
-                s.name as 'Type_Schema',
-                t.name as 'Type_Name',
-                tt.name as 'Base_Type_Name',
-                t.max_length as 'Max_Length',
-                t.is_nullable as 'Nullable'
-            from sys.types t
-            inner join sys.schemas s on s.schema_id = t.schema_id
-            inner join sys.types tt on t.system_type_id = tt.user_type_id
-            where
-                t.is_user_defined = 1
-            and t.is_table_type = 0";
+				select
+					s.name as 'Type_Schema',
+					t.name as 'Type_Name',
+					tt.name as 'Base_Type_Name',
+					t.max_length as 'Max_Length',
+					t.is_nullable as 'Nullable'
+				from sys.types t
+					inner join sys.schemas s on s.schema_id = t.schema_id
+					inner join sys.types tt on t.system_type_id = tt.user_type_id
+				where
+					t.is_user_defined = 1
+					and t.is_table_type = 0
+";
 
 			using (var dr = cm.ExecuteReader()) {
-				LoadUserDefinedTypesBase(dr, UserDefinedTypes);
+				LoadUserDefinedTypesBase(dr, UserDefinedTypes, () => log(TraceLevel.Verbose, "- Loading User Defined Types...\r"));
 			}
 		}
 
 		private void LoadUserDefinedTypesBase(SqlDataReader dr,
-			List<UserDefinedType> userDefinedTypes) {
+			List<UserDefinedType> userDefinedTypes, Action moveLoading) {
 			while (dr.Read()) {
+				moveLoading();
 				userDefinedTypes.Add(new UserDefinedType((string)dr["Type_Schema"],
 					(string)dr["Type_Name"],
 					(string)dr["Base_Type_Name"],
@@ -973,14 +1047,17 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private static void LoadTablesBase(SqlDataReader dr, bool areTableTypes,
-			List<Table> tables) {
+			List<Table> tables, Action moveLoading) {
 			while (dr.Read()) {
+				moveLoading();
 				tables.Add(new Table((string)dr["TABLE_SCHEMA"], (string)dr["TABLE_NAME"])
 					{ IsType = areTableTypes });
 			}
 		}
 
-		private void LoadSchemas(SqlCommand cm) {
+		private void LoadSchemas(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("schemas")) return;
+
 			//get schemas
 			cm.CommandText = @"
 					select s.name as schemaName, p.name as principalName
@@ -992,12 +1069,15 @@ order by fk.name, fkc.constraint_column_id
 ";
 			using (var dr = cm.ExecuteReader()) {
 				while (dr.Read()) {
+					log(TraceLevel.Verbose, "- Loading Schemas...\r");
 					Schemas.Add(new Schema((string)dr["schemaName"], (string)dr["principalName"]));
 				}
 			}
 		}
 
-		private void LoadProps(SqlCommand cm) {
+		private void LoadProps(SqlCommand cm, Action<TraceLevel, string> log) {
+			if (!_dirs.Contains("props")) return;
+
 			var cnStrBuilder = new SqlConnectionStringBuilder(Connection);
 			// query schema for database properties
 			cm.CommandText = @"
@@ -1399,6 +1479,7 @@ where name = @dbname
 				File.AppendAllText(filePath, text);
 			} else {
 				FilesCreated.Add(filePath);
+				text = $"/****** Created: {DateTime.Now.ToString("dddd, dd MMMM yyyy h:mm:ss tt")} ******/\r\n\r\n{text}";
 				File.WriteAllText(filePath, text);
 			}
 		}
