@@ -13,7 +13,9 @@ namespace SchemaZen.Library.Models {
 	public class Database {
 		#region " Constructors "
 
-		public Database(IList<string> filteredTypes = null) {
+		public Database(IList<string> filteredTypes = null, bool singleDir = false) {
+			SingleDir = singleDir;
+
 			Props.Add(new DbProp("COMPATIBILITY_LEVEL", ""));
 			Props.Add(new DbProp("COLLATE", ""));
 			Props.Add(new DbProp("AUTO_CLOSE", ""));
@@ -47,8 +49,8 @@ namespace SchemaZen.Library.Models {
 			}
 		}
 
-		public Database(string name, IList<string> filteredTypes = null)
-			: this(filteredTypes) {
+		public Database(string name, IList<string> filteredTypes = null, bool singleDir = false)
+			: this(filteredTypes, singleDir) {
 			Name = name;
 		}
 
@@ -69,6 +71,7 @@ namespace SchemaZen.Library.Models {
 		public string Dir { get; set; } = "";
 		public List<ForeignKey> ForeignKeys { get; set; } = new List<ForeignKey>();
 		public string Name { get; set; }
+		public bool SingleDir { get; set; }
 
 		public List<DbProp> Props { get; set; } = new List<DbProp>();
 		public List<Routine> Routines { get; set; } = new List<Routine>();
@@ -1322,19 +1325,13 @@ where name = @dbname
 			if (log == null) log = (tl, s) => { };
 
 			if (Directory.Exists(Dir)) {
-				// delete the existing script files
 				log(TraceLevel.Verbose, "Deleting existing files...");
 
-				var files = Dirs.Select(dir => Path.Combine(Dir, dir))
-					.Where(Directory.Exists).SelectMany(Directory.GetFiles);
-				foreach (var f in files) {
-					File.Delete(f);
-				}
+				Directory.Delete(Dir, true);
 
 				log(TraceLevel.Verbose, "Existing files deleted.");
-			} else {
-				Directory.CreateDirectory(Dir);
 			}
+			Directory.CreateDirectory(Dir);
 
 			WritePropsScript(log);
 			WriteSchemaScript(log);
@@ -1385,8 +1382,11 @@ where name = @dbname
 			Action<TraceLevel, string> log) {
 			if (!objects.Any()) return;
 			if (!Dirs.Contains(name)) return;
-			var dir = Path.Combine(Dir, name);
-			Directory.CreateDirectory(dir);
+			var dir = Dir;
+			if (!SingleDir) {
+				dir = Path.Combine(dir, name);
+				Directory.CreateDirectory(dir);
+			}
 			var index = 0;
 			foreach (var o in objects) {
 				log(TraceLevel.Verbose,
