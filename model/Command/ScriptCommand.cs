@@ -9,9 +9,17 @@ namespace SchemaZen.Library.Command {
 		public void Execute(Dictionary<string, string> namesAndSchemas, string dataTablesPattern,
 			string dataTablesExcludePattern, string namePattern, string nameExcludePattern,
 			string tableHint, List<string> filteredTypes, bool singleDir) {
-			if (!Overwrite && Directory.Exists(ScriptDir)) {
-				var message = $"{ScriptDir} already exists - you must set overwrite to true";
-				throw new InvalidOperationException(message);
+			if (Directory.Exists(ScriptDir)) {
+				if (Overwrite) {
+					Logger.Log(TraceLevel.Verbose, "Deleting existing files...");
+
+					Directory.Delete(ScriptDir, true);
+
+					Logger.Log(TraceLevel.Verbose, "Existing files deleted.");
+				} else if (!OverwriteFiles) {
+					var message = $"{ScriptDir} already exists - you must set overwrite or overwriteFiles to true";
+					throw new InvalidOperationException(message);
+				}
 			}
 
 			var db = CreateDatabase(filteredTypes, singleDir);

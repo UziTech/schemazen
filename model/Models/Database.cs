@@ -84,6 +84,7 @@ namespace SchemaZen.Library.Models {
 		public List<SqlUser> Users { get; set; } = new List<SqlUser>();
 		public List<Constraint> ViewIndexes { get; set; } = new List<Constraint>();
 		public List<Permission> Permissions { get; set; } = new List<Permission>();
+		public List<string> FilesCreated { get; set; } = new List<string>();
 
 		public DbProp FindProp(string name) {
 			return Props.FirstOrDefault(p =>
@@ -252,12 +253,12 @@ namespace SchemaZen.Library.Models {
 				// get permissions
 				// based on http://sql-articles.com/scripts/script-to-retrieve-security-information-sql-server-2005-and-above/
 				cm.CommandText = @"
-						select 
-								U.name as user_name, 
-								O.name as object_name,  
+						select
+								U.name as user_name,
+								O.name as object_name,
 								permission_name as permission
 						from sys.database_permissions
-						join sys.sysusers U on grantee_principal_id = uid 
+						join sys.sysusers U on grantee_principal_id = uid
 						join sys.sysobjects O on major_id = id ";
 				using (var dr = cm.ExecuteReader()) {
 					while (dr.Read()) {
@@ -1324,13 +1325,6 @@ where name = @dbname
 		public void ScriptToDir(string tableHint = null, Action<TraceLevel, string> log = null) {
 			if (log == null) log = (tl, s) => { };
 
-			if (Directory.Exists(Dir)) {
-				log(TraceLevel.Verbose, "Deleting existing files...");
-
-				Directory.Delete(Dir, true);
-
-				log(TraceLevel.Verbose, "Existing files deleted.");
-			}
 			Directory.CreateDirectory(Dir);
 
 			WritePropsScript(log);
@@ -1362,7 +1356,8 @@ where name = @dbname
 			text.Append(ScriptPropList(Props));
 			text.AppendLine("GO");
 			text.AppendLine();
-			File.WriteAllText($"{Dir}/props.sql", text.ToString());
+			var filePath = Path.Combine(Dir, "props.sql");
+			WriteToFile(filePath, text.ToString());
 		}
 
 		private void WriteSchemaScript(Action<TraceLevel, string> log) {
@@ -1375,7 +1370,8 @@ where name = @dbname
 
 			text.AppendLine("GO");
 			text.AppendLine();
-			File.WriteAllText($"{Dir}/schemas.sql", text.ToString());
+			var filePath = Path.Combine(Dir, "schemas.sql");
+			WriteToFile(filePath, text.ToString());
 		}
 
 		private void WriteScriptDir(string name, ICollection<IScriptable> objects,
@@ -1388,12 +1384,22 @@ where name = @dbname
 				Directory.CreateDirectory(dir);
 			}
 			var index = 0;
+
 			foreach (var o in objects) {
 				log(TraceLevel.Verbose,
 					$"Scripting {name} {++index} of {objects.Count}...{(index < objects.Count ? "\r" : string.Empty)}");
 				var filePath = Path.Combine(dir, MakeFileName(o) + ".sql");
 				var script = o.ScriptCreate() + "\r\nGO\r\n";
-				File.AppendAllText(filePath, script);
+				WriteToFile(filePath, script);
+			}
+		}
+
+		private void WriteToFile(string filePath, string text) {
+			if (FilesCreated.Contains(filePath)) {
+				File.AppendAllText(filePath, text);
+			} else {
+				FilesCreated.Add(filePath);
+				File.WriteAllText(filePath, text);
 			}
 		}
 
