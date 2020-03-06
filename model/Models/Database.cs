@@ -133,7 +133,7 @@ namespace SchemaZen.Library.Models {
 		}
 
 		public List<Table> FindTablesRegEx(string pattern, string excludePattern = null) {
-			return Tables.Where(t => FindNameRegExPredicate(t.name, pattern, excludePattern)).ToList();
+			return Tables.Where(t => FindNameRegExPredicate(t.Name, pattern, excludePattern)).ToList();
 		}
 
 		public void FilterNameRegEx(string pattern, string excludePattern = null) {
@@ -232,7 +232,7 @@ namespace SchemaZen.Library.Models {
 		}
 
 		private void LoadSynonyms(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("synonyms")) return;
+			if (!Dirs.Contains("synonyms")) return;
 
 			try {
 				// get synonyms
@@ -254,7 +254,7 @@ namespace SchemaZen.Library.Models {
 		}
 
 		private void LoadPermissions(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("permissions")) return;
+			if (!Dirs.Contains("permissions")) return;
 
 			try {
 				// get permissions
@@ -281,7 +281,7 @@ namespace SchemaZen.Library.Models {
 		}
 
 		private void LoadRoles(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("roles")) return;
+			if (!Dirs.Contains("roles")) return;
 
 			//Roles are complicated.  This was adapted from https://dbaeyes.wordpress.com/2013/04/19/fully-script-out-a-mssql-database-role/
 			cm.CommandText = @"
@@ -400,7 +400,7 @@ from #ScriptedRoles
 		}
 
 		private void LoadUsersAndLogins(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("users")) return;
+			if (!Dirs.Contains("users")) return;
 
 			// get users that have access to the database
 			cm.CommandText = @"
@@ -447,7 +447,7 @@ from #ScriptedRoles
 		}
 
 		private void LoadCLRAssemblies(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("assemblies")) return;
+			if (!Dirs.Contains("assemblies")) return;
 
 			try {
 				// get CLR assemblies
@@ -478,7 +478,7 @@ from #ScriptedRoles
 		}
 
 		private void LoadXmlSchemas(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("xmlschemacollections")) return;
+			if (!Dirs.Contains("xmlschemacollections")) return;
 
 			try {
 				// get xml schemas
@@ -508,14 +508,14 @@ from #ScriptedRoles
 
 		private void LoadRoutines(SqlCommand cm, Action<TraceLevel, string> log) {
 			var types = new List<string>();
-			if (_dirs.Contains("functions")) {
+			if (Dirs.Contains("functions")) {
 				types.Add("SQL_SCALAR_FUNCTION");
 				types.Add("SQL_INLINE_TABLE_VALUED_FUNCTION");
 				types.Add("SQL_TABLE_VALUED_FUNCTION");
 			}
-			if (_dirs.Contains("procedures")) types.Add("SQL_STORED_PROCEDURE");
-			if (_dirs.Contains("triggers")) types.Add("SQL_TRIGGER");
-			if (_dirs.Contains("views")) types.Add("VIEW");
+			if (Dirs.Contains("procedures")) types.Add("SQL_STORED_PROCEDURE");
+			if (Dirs.Contains("triggers")) types.Add("SQL_TRIGGER");
+			if (Dirs.Contains("views")) types.Add("VIEW");
 
 			if (!types.Any()) return;
 
@@ -575,7 +575,7 @@ from #ScriptedRoles
 		}
 
 		private void LoadCheckConstraints(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("tables")) return;
+			if (!Dirs.Contains("tables")) return;
 
 			cm.CommandText = @"
 
@@ -616,7 +616,7 @@ from #ScriptedRoles
 		}
 
 		private void LoadForeignKeys(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("foreign_keys")) return;
+			if (!Dirs.Contains("foreign_keys")) return;
 
 			//get foreign keys
 			cm.CommandText = @"
@@ -703,9 +703,9 @@ order by fk.name, fkc.constraint_column_id
 
 		private void LoadConstraintsAndIndexes(SqlCommand cm, Action<TraceLevel, string> log) {
 			var types = new List<string>();
-			if (_dirs.Contains("views")) types.Add("V");
-			if (_dirs.Contains("tables")) types.Add("T");
-			if (_dirs.Contains("table_types")) types.Add("TVT");
+			if (Dirs.Contains("views")) types.Add("V");
+			if (Dirs.Contains("tables")) types.Add("T");
+			if (Dirs.Contains("table_types")) types.Add("TVT");
 
 			if (!types.Any()) return;
 
@@ -790,7 +790,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadColumnComputes(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("tables")) return;
+			if (!Dirs.Contains("tables")) return;
 
 			//get computed column definitions
 			cm.CommandText = @"
@@ -814,7 +814,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadColumnDefaults(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("tables")) return;
+			if (!Dirs.Contains("tables")) return;
 
 			//get column defaults
 			cm.CommandText = @"
@@ -842,7 +842,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadColumnIdentities(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("tables")) return;
+			if (!Dirs.Contains("tables")) return;
 
 			//get column identities
 			cm.CommandText = @"
@@ -875,7 +875,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadColumns(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (_dirs.Contains("tables")) {
+			if (Dirs.Contains("tables")) {
 				//get columns
 				cm.CommandText = @"
 					select
@@ -903,7 +903,7 @@ order by fk.name, fkc.constraint_column_id
 				}
 			}
 
-			if (_dirs.Contains("table_types")) {
+			if (Dirs.Contains("table_types")) {
 				try {
 					cm.CommandText = @"
 						select
@@ -980,7 +980,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadTables(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (_dirs.Contains("tables")) {
+			if (Dirs.Contains("tables")) {
 				//get tables
 				cm.CommandText = @"
 					select
@@ -993,7 +993,7 @@ order by fk.name, fkc.constraint_column_id
 				}
 			}
 
-			if (_dirs.Contains("table_types")) {
+			if (Dirs.Contains("table_types")) {
 				//get table types
 				try {
 					cm.CommandText = @"
@@ -1014,7 +1014,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadUserDefinedTypes(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("user_defined_types")) return;
+			if (!Dirs.Contains("user_defined_types")) return;
 
 			//get types
 			cm.CommandText = @"
@@ -1059,7 +1059,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadSchemas(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("schemas")) return;
+			if (!Dirs.Contains("schemas")) return;
 
 			//get schemas
 			cm.CommandText = @"
@@ -1079,7 +1079,7 @@ order by fk.name, fkc.constraint_column_id
 		}
 
 		private void LoadProps(SqlCommand cm, Action<TraceLevel, string> log) {
-			if (!_dirs.Contains("props")) return;
+			if (!Dirs.Contains("props")) return;
 
 			var cnStrBuilder = new SqlConnectionStringBuilder(Connection);
 			// query schema for database properties
